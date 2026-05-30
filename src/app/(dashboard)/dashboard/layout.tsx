@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Sidebar } from '@/components/sidebar'
 import { Topbar } from '@/components/topbar'
+import { OnboardingTour } from '@/components/onboarding-tour'
 
 export default function DashboardLayout({
   children,
@@ -27,6 +28,9 @@ export default function DashboardLayout({
           </div>
         </main>
       </div>
+
+      {/* Interactive onboarding sequence */}
+      <OnboardingTour />
     </div>
   )
 }

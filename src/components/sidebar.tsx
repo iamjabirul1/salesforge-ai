@@ -63,10 +63,12 @@ export function Sidebar({ className }: SidebarProps) {
           const isActive =
             pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
           const Icon = item.icon
+          const elementId = `sidebar-${item.name.toLowerCase().replace(/\s+/g, '-')}`
 
           return (
             <Link
               key={item.name}
+              id={elementId}
               href={item.href}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group active:scale-[0.98]',
