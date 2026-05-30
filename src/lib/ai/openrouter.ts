@@ -13,24 +13,24 @@ export const openrouter = createOpenAI({
   },
 })
 
-// Models available on OpenRouter (including free tier options)
+// Models available on OpenRouter (using 100% free tier options)
 export const MODELS = {
   // Primary fast workhorse model
-  fast: 'google/gemini-2.5-flash',
+  fast: 'google/gemini-2.5-flash:free',
   
   // Advanced general reasoning / text writing model
-  writing: 'deepseek/deepseek-chat', // DeepSeek V3
+  writing: 'google/gemini-2.5-flash:free',
   
   // High reasoning / objection handling / complex decisions model
-  reasoning: 'meta-llama/llama-3.3-70b-instruct',
+  reasoning: 'meta-llama/llama-3.3-70b-instruct:free',
   
   // Fallbacks if user changes defaults
-  gpt4oMini: 'openai/gpt-4o-mini',
-  gpt4o: 'openai/gpt-4o',
+  gpt4oMini: 'google/gemini-2.5-flash:free',
+  gpt4o: 'meta-llama/llama-3.3-70b-instruct:free',
 }
 
 export type ModelType = keyof typeof MODELS
 export const DEFAULT_MODEL = MODELS.fast
 export const DEFAULT_WRITING_MODEL = MODELS.writing
 export const DEFAULT_REASONING_MODEL = MODELS.reasoning
-export const DEFAULT_MODEL_NAME = 'google/gemini-2.5-flash'
+export const DEFAULT_MODEL_NAME = 'google/gemini-2.5-flash:free'

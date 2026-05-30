@@ -57,7 +57,7 @@ export default function SettingsPage() {
         setApolloKey(settings.apollo_api_key_encrypted || '')
         setResendKey(settings.resend_api_key || '')
         setSendingDomain(settings.email_sending_domain || '')
-        setModel(settings.default_model || 'google/gemini-2.5-flash')
+        setModel(settings.default_model || 'google/gemini-2.5-flash:free')
         setEmailLimit(settings.daily_email_limit || 50)
       }
 
@@ -226,14 +226,14 @@ export default function SettingsPage() {
                   onChange={(e) => setModel(e.target.value)}
                   className="flex h-10 w-full rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:border-transparent transition-all"
                 >
-                  <option value="google/gemini-2.5-flash" className="bg-slate-950">
-                    Gemini 2.5 Flash (Default)
+                  <option value="google/gemini-2.5-flash:free" className="bg-slate-950">
+                    Gemini 2.5 Flash Free (Recommended)
                   </option>
-                  <option value="deepseek/deepseek-chat" className="bg-slate-950">
-                    DeepSeek V3 (Writing workhorse)
+                  <option value="meta-llama/llama-3.3-70b-instruct:free" className="bg-slate-950">
+                    Llama 3.3 70B Free (High Reasoning)
                   </option>
-                  <option value="meta-llama/llama-3.3-70b-instruct" className="bg-slate-950">
-                    Llama 3.3 70B (Objection handler)
+                  <option value="qwen/qwen-2.5-72b-instruct:free" className="bg-slate-950">
+                    Qwen 2.5 72B Free (General Writing)
                   </option>
                 </select>
               </div>
