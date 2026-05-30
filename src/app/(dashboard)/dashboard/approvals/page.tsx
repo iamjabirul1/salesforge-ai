@@ -246,7 +246,7 @@ export default function ApprovalsPage() {
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
                       <label className="text-xs font-semibold text-slate-400">Message Body</label>
-                      <Button variant="ghost" size="xs" onClick={handleCopyOnly} className="text-xs text-slate-400 hover:text-white h-7">
+                      <Button variant="ghost" size="sm" onClick={handleCopyOnly} className="text-xs text-slate-400 hover:text-white h-7">
                         Copy to Clipboard
                       </Button>
                     </div>
