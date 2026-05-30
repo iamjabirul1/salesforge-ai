@@ -57,7 +57,55 @@ export async function approveAction(approvalId: string, editedSubject?: string, 
     .eq('org_id', approval.org_id)
     .maybeSingle()
 
-  // 3. Mark outreach as sending
+  // 3. Check channel — if not email, mark as sent directly (simulated send / manual clipboard copy)
+  const isEmail = (outreach.channel || 'email') === 'email'
+  const channelLabel = (outreach.channel || 'email').toUpperCase()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!isEmail) {
+    // Update Outreach and Approval statuses directly
+    await supabase
+      .from('outreach_queue')
+      .update({
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        approved_by: user?.id,
+        subject: finalSubject,
+        body: finalBody,
+      })
+      .eq('id', outreachId)
+
+    await supabase
+      .from('approval_queue')
+      .update({
+        status: 'approved',
+        reviewed_by: user?.id,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', approvalId)
+
+    // Log activity in CRM timeline
+    await supabase.from('activities').insert({
+      org_id: approval.org_id,
+      contact_id: contactId,
+      type: 'note_added',
+      subject: `${channelLabel} Message Dispatched`,
+      description: `${channelLabel} message sent to prospect.`,
+      metadata: { body: finalBody },
+    })
+
+    // Update contact status to contacted
+    await supabase
+      .from('contacts')
+      .update({ status: 'contacted' })
+      .eq('id', contactId)
+
+    return { success: true }
+  }
+
+  // 3. Mark outreach as sending (For Email)
   await supabase
     .from('outreach_queue')
     .update({
@@ -88,17 +136,12 @@ export async function approveAction(approvalId: string, editedSubject?: string, 
   const emailId = sendResult.id
 
   // 5. Update Outreach and Approval statuses
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
   await supabase
     .from('outreach_queue')
     .update({
       status: 'sent',
       sent_at: new Date().toISOString(),
       approved_by: user?.id,
-      // store Resend ID inside metadata or queue if needed
     })
     .eq('id', outreachId)
 

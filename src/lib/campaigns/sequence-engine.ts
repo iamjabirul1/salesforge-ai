@@ -89,28 +89,37 @@ export async function scheduleFollowUps(campaignId: string): Promise<void> {
 
   if (!campaign?.sequence_steps) return
 
-  const steps = campaign.sequence_steps as SequenceStep[]
+  const steps = campaign.sequence_steps as any[]
   if (steps.length <= 1) return
 
-  // Find contacts who received step 1 (sent) but haven't replied
-  const { data: step1Sent } = await supabase
+  // Find all sent outreach items in this campaign that haven't replied
+  const { data: sentOutreach } = await supabase
     .from('outreach_queue')
-    .select('contact_id, sent_at')
+    .select('contact_id, sent_at, channel, content')
     .eq('campaign_id', campaignId)
     .eq('status', 'sent')
     .is('replied_at', null)
 
-  if (!step1Sent || step1Sent.length === 0) return
+  if (!sentOutreach || sentOutreach.length === 0) return
 
-  const followUpStep = steps[1]
-  const delayMs = (followUpStep.delay_days || 3) * 24 * 60 * 60 * 1000
   const now = Date.now()
 
-  for (const sent of step1Sent) {
+  for (const sent of sentOutreach) {
+    const sentContent = sent.content as any
+    const lastStepNumber = Number(sentContent?.step || 1)
+    const nextStepIndex = lastStepNumber // since index is step - 1, step N corresponds to index N in 0-based array for N+1
+
+    // If there is no next step, we've completed the sequence
+    if (nextStepIndex >= steps.length) continue
+
+    const nextStep = steps[nextStepIndex]
+    const delayDays = Number(nextStep.delay_days || 3)
+    const delayMs = delayDays * 24 * 60 * 60 * 1000
     const sentAt = new Date(sent.sent_at).getTime()
+
     if (now - sentAt < delayMs) continue // not yet due
 
-    // Check if follow-up already scheduled
+    // Check if next step is already scheduled or pending
     const { data: existing } = await supabase
       .from('outreach_queue')
       .select('id')
@@ -121,16 +130,18 @@ export async function scheduleFollowUps(campaignId: string): Promise<void> {
 
     if (existing && existing.length > 0) continue
 
-    // Schedule follow-up
+    const nextChannel = nextStep.channel || 'email'
+
+    // Schedule follow-up with the correct channel
     await supabase.from('outreach_queue').insert({
       campaign_id: campaignId,
       contact_id: sent.contact_id,
-      channel: 'email',
+      channel: nextChannel,
       status: 'pending',
       content: {
-        subject: followUpStep.subject,
-        body: followUpStep.body_template,
-        step: 2,
+        subject: nextStep.subject || `Follow up Step ${nextStep.step}`,
+        body: nextStep.body_template || '',
+        step: nextStep.step,
       },
       scheduled_at: new Date().toISOString(),
       requires_approval: true,

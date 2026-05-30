@@ -211,12 +211,15 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Email Sending Domain</label>
+                <label className="text-xs font-semibold text-slate-300">Email Domain & Cal.com Scheduling Handle</label>
                 <Input
-                  placeholder="updates.salesforge-ai.com"
+                  placeholder="updates.salesforge-ai.com or cal-username"
                   value={sendingDomain}
                   onChange={(e) => setSendingDomain(e.target.value)}
                 />
+                <span className="text-[10px] text-slate-500 font-mono">
+                  If set to "cal-username", emails will auto-inject "https://cal.com/cal-username"
+                </span>
               </div>
 
               <div className="space-y-1.5">

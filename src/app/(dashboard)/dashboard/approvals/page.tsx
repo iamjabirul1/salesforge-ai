@@ -76,12 +76,30 @@ export default function ApprovalsPage() {
     if (!selectedItem) return
     setActionLoading(true)
 
+    // Check if social message — for social we copy to clipboard and mark as sent
+    const isSocial = selectedItem.action_type === 'send_social_message'
+    const channel = selectedItem.context?.channel || 'email'
+
     const result = await approveAction(selectedItem.id, editedSubject, editedBody)
 
     if (result.error) {
       toast({ type: 'error', description: result.error })
     } else {
-      toast({ type: 'success', description: 'Outreach email approved and sent successfully!' })
+      if (isSocial) {
+        // Copy text to clipboard
+        navigator.clipboard.writeText(editedBody)
+        toast({ 
+          type: 'success', 
+          description: `Message copied! Approved and marked as sent on ${channel.toUpperCase()}.` 
+        })
+        
+        // Open social URL in new window if available
+        if (selectedItem.context?.social_url) {
+          window.open(selectedItem.context.social_url, '_blank')
+        }
+      } else {
+        toast({ type: 'success', description: 'Outreach email approved and sent successfully!' })
+      }
       loadApprovals()
     }
     setActionLoading(false)
@@ -100,6 +118,12 @@ export default function ApprovalsPage() {
       loadApprovals()
     }
     setActionLoading(false)
+  }
+
+  const handleCopyOnly = () => {
+    if (!selectedItem) return
+    navigator.clipboard.writeText(editedBody)
+    toast({ type: 'success', description: 'Message body copied to clipboard!' })
   }
 
   return (
@@ -132,32 +156,36 @@ export default function ApprovalsPage() {
           <div className="lg:col-span-1 space-y-4">
             <h3 className="text-sm font-semibold text-slate-300">Pending Review ({items.length})</h3>
             <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-              {items.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => selectItem(item)}
-                  className={`w-full text-left p-4 rounded-xl border transition-all duration-200 hover:bg-slate-900/20 active:scale-[0.99] flex flex-col gap-2 ${
-                    selectedItem?.id === item.id
-                      ? 'border-violet-500 bg-slate-900/40 shadow-lg shadow-violet-500/5'
-                      : 'border-slate-800 bg-slate-950/40'
-                  }`}
-                >
-                  <div className="flex justify-between items-start w-full">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      {item.action_type === 'send_email_reply' ? 'Reply Draft' : 'Cold Outreach'}
-                    </span>
-                    <Badge variant={item.context?.escalated ? 'destructive' : 'warning'}>
-                      {item.context?.escalated ? 'Escalated' : 'Pending'}
-                    </Badge>
-                  </div>
-                  <div className="text-sm font-bold text-slate-200 truncate">
-                    {item.context?.prospect_name || 'Prospect'}
-                  </div>
-                  <div className="text-xs text-slate-500 font-mono truncate">
-                    {item.context?.company_name || 'Company'}
-                  </div>
-                </button>
-              ))}
+              {items.map((item) => {
+                const isSocial = item.action_type === 'send_social_message'
+                const channel = item.context?.channel || 'email'
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => selectItem(item)}
+                    className={`w-full text-left p-4 rounded-xl border transition-all duration-200 hover:bg-slate-900/20 active:scale-[0.99] flex flex-col gap-2 ${
+                      selectedItem?.id === item.id
+                        ? 'border-violet-500 bg-slate-900/40 shadow-lg shadow-violet-500/5'
+                        : 'border-slate-800 bg-slate-950/40'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start w-full">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        {isSocial ? `${channel.toUpperCase()} outreach` : item.action_type === 'send_email_reply' ? 'Reply Draft' : 'Cold Email'}
+                      </span>
+                      <Badge variant={item.context?.escalated ? 'destructive' : 'warning'}>
+                        {item.context?.escalated ? 'Escalated' : 'Pending'}
+                      </Badge>
+                    </div>
+                    <div className="text-sm font-bold text-slate-200 truncate">
+                      {item.context?.prospect_name || 'Prospect'}
+                    </div>
+                    <div className="text-xs text-slate-500 font-mono truncate">
+                      {item.context?.company_name || 'Company'}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -171,10 +199,10 @@ export default function ApprovalsPage() {
                       <CardTitle className="text-lg">
                         {selectedItem.action_type === 'send_email_reply'
                           ? `Review Reply to ${selectedItem.context.prospect_name}`
-                          : `Review Cold Outreach to ${selectedItem.context.prospect_name}`}
+                          : `Review Outreach to ${selectedItem.context.prospect_name}`}
                       </CardTitle>
                       <CardDescription className="text-xs font-mono">
-                        Company: {selectedItem.context.company_name} | Channel: Email
+                        Company: {selectedItem.context.company_name} | Channel: {selectedItem.context?.channel?.toUpperCase() || 'EMAIL'}
                       </CardDescription>
                     </div>
                   </div>
@@ -199,25 +227,32 @@ export default function ApprovalsPage() {
                     </div>
                   )}
 
-                  {/* Subject line input */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-400">Email Subject</label>
-                    <Input
-                      value={editedSubject}
-                      onChange={(e: any) => setEditedSubject(e.target.value)}
-                      placeholder="Email Subject Line"
-                      disabled={actionLoading}
-                    />
-                  </div>
+                  {/* Subject line input (Only for email) */}
+                  {selectedItem.action_type !== 'send_social_message' && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-400">Email Subject</label>
+                      <Input
+                        value={editedSubject}
+                        onChange={(e: any) => setEditedSubject(e.target.value)}
+                        placeholder="Email Subject Line"
+                        disabled={actionLoading}
+                      />
+                    </div>
+                  )}
 
                   {/* Body textarea */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-400">Email Body</label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-semibold text-slate-400">Message Body</label>
+                      <Button variant="ghost" size="xs" onClick={handleCopyOnly} className="text-xs text-slate-400 hover:text-white h-7">
+                        Copy to Clipboard
+                      </Button>
+                    </div>
                     <textarea
                       value={editedBody}
                       onChange={(e: any) => setEditedBody(e.target.value)}
                       className="flex min-h-[250px] w-full rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:border-transparent transition-all"
-                      placeholder="Write your email body..."
+                      placeholder="Write your outreach message..."
                       disabled={actionLoading}
                     />
                   </div>
@@ -234,7 +269,11 @@ export default function ApprovalsPage() {
                     <Button variant="premium" onClick={handleApprove} disabled={actionLoading}>
                       {actionLoading ? (
                         <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" /> dispatching...
+                        </>
+                      ) : selectedItem.action_type === 'send_social_message' ? (
+                        <>
+                          <Check className="h-4 w-4 mr-2" /> Copy & Open Social Profile
                         </>
                       ) : (
                         <>

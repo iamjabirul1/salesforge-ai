@@ -68,8 +68,10 @@ export default function NewCampaignPage() {
         status: 'draft',
         target_icp: targetIcp,
         sequence_steps: [
-          { step: 1, delay_days: 0, subject: 'Default cold outreach' },
-          { step: 2, delay_days: 3, subject: 'Follow up' },
+          { step: 1, delay_days: 0, subject: 'Initial Cold Email', channel: 'email', body_template: 'Hi {{first_name}}, saw you are CEO at {{company_name}}. We help companies scale dev capacity. Interested in a brief chat?' },
+          { step: 2, delay_days: 1, subject: 'LinkedIn Connect', channel: 'linkedin', body_template: 'Hi {{first_name}} - saw your profile and wanted to connect about your software work at {{company_name}}!' },
+          { step: 3, delay_days: 2, subject: 'X DM Follow-up', channel: 'x', body_template: 'Hey {{first_name}} - sent you an email yesterday but wanted to say hi here! Would love to sync up about AI integrations.' },
+          { step: 4, delay_days: 3, subject: 'Meta Follow-up', channel: 'facebook', body_template: 'Hi {{first_name}} - following up here regarding custom AI engineering. Let me know if you would like a brief call.' },
         ],
       })
       .select('id')
