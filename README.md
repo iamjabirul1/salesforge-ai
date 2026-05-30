@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SalesForge AI 🚀
+### Autonomous AI Sales Organization
 
-## Getting Started
+> Replace 70% of your SDR team with AI agents that find prospects, write personalized emails, handle objections, and fill your pipeline — 24/7.
 
-First, run the development server:
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/iamjabirul1/salesforge-ai&project-name=salesforge-ai&repository-name=salesforge-ai&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,OPENROUTER_API_KEY,BREVO_API_KEY,RESEND_API_KEY,NEXT_PUBLIC_APP_URL&envDescription=API%20keys%20needed%20for%20SalesForge%20AI)
+
+---
+
+## ⚡ Quick Deploy (2 Minutes)
+
+### Step 1: Click the Deploy Button Above
+
+Or go to: https://vercel.com/new/clone?repository-url=https://github.com/iamjabirul1/salesforge-ai
+
+### Step 2: Set Environment Variables in Vercel
+
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://dlxzbwhfdazopymzcvfe.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | *(from your Supabase dashboard)* |
+| `SUPABASE_SERVICE_ROLE_KEY` | *(from your Supabase dashboard)* |
+| `OPENROUTER_API_KEY` | *(from openrouter.ai)* |
+| `BREVO_API_KEY` | *(from brevo.com)* |
+| `RESEND_API_KEY` | *(from resend.com)* |
+| `NEXT_PUBLIC_APP_URL` | *(your-app.vercel.app — fill after deploy)* |
+
+### Step 3: Deploy → Done!
+
+---
+
+## Local Development
 
 ```bash
+git clone https://github.com/iamjabirul1/salesforge-ai
+cd salesforge-ai
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App runs at http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Features
 
-## Learn More
+| Feature | Description |
+|---------|-------------|
+| CEO Orchestrator | Autonomous goal decomposition and agent delegation |
+| Research Agent | Apollo.io lead discovery and ICP scoring |
+| Email Writer Agent | Personalized cold outreach (AIDA/PAS frameworks) |
+| Follow-Up Agent | Reply classification and objection handling |
+| Human-in-the-Loop | Approval queue for all emails before sending |
+| CRM Pipeline | Kanban deal board with drag-and-drop |
+| Brevo Integration | Email sending without domain verification |
+| Analytics | Open rates, reply rates, agent performance |
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tech Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Frontend**: Next.js 16, TypeScript, Tailwind CSS
+- **Database**: Supabase (PostgreSQL + Realtime + Auth)
+- **AI**: OpenRouter (DeepSeek V3, Gemini 2.5 Flash, Llama 3.3 70B)
+- **Email**: Brevo + Resend
+- **Monitoring**: Langfuse
+- **Deploy**: Vercel
