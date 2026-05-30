@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 import { createClient } from '@/lib/supabase/client'
 import { saveSettingsAction, addKbEntryAction, deleteKbEntryAction } from '@/app/actions/settings'
-import { Settings, Key, HelpCircle, Save, Plus, Trash2, Loader2, Bot } from 'lucide-react'
+import { saveSocialSettingsAction, getSocialSettingsAction } from '@/app/actions/social-settings'
+import { Settings, Key, HelpCircle, Save, Plus, Trash2, Loader2, Bot, Info, ShieldCheck, HelpCircle as HelpIcon } from 'lucide-react'
 
 interface KbEntry {
   id: string
@@ -18,7 +19,7 @@ interface KbEntry {
 
 export default function SettingsPage() {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = React.useState<'keys' | 'kb'>('keys')
+  const [activeTab, setActiveTab] = React.useState<'keys' | 'kb' | 'social'>('keys')
   const [loading, setLoading] = React.useState(true)
   const [actionLoading, setActionLoading] = React.useState(false)
 
@@ -27,8 +28,14 @@ export default function SettingsPage() {
   const [apolloKey, setApolloKey] = React.useState('')
   const [resendKey, setResendKey] = React.useState('')
   const [sendingDomain, setSendingDomain] = React.useState('')
-  const [model, setModel] = React.useState('google/gemini-2.5-flash')
+  const [model, setModel] = React.useState('google/gemini-2.5-flash:free')
   const [emailLimit, setEmailLimit] = React.useState(50)
+
+  // Social automation placeholders
+  const [rapidapiKey, setRapidapiKey] = React.useState('')
+  const [linkedinUrl, setLinkedinUrl] = React.useState('')
+  const [xUrl, setXUrl] = React.useState('')
+  const [facebookUrl, setFacebookUrl] = React.useState('')
 
   // Knowledge base state
   const [kbEntries, setKbEntries] = React.useState<KbEntry[]>([])
@@ -70,6 +77,15 @@ export default function SettingsPage() {
       if (kbData) {
         setKbEntries(kbData as KbEntry[])
       }
+
+      // 3. Load Social settings
+      const socialResult = await getSocialSettingsAction()
+      if (socialResult && !socialResult.error) {
+        setRapidapiKey(socialResult.rapidapiKey || '')
+        setLinkedinUrl(socialResult.linkedinUrl || '')
+        setXUrl(socialResult.xUrl || '')
+        setFacebookUrl(socialResult.facebookUrl || '')
+      }
     }
 
     setLoading(false)
@@ -78,6 +94,26 @@ export default function SettingsPage() {
   React.useEffect(() => {
     loadSettingsAndKb()
   }, [loadSettingsAndKb])
+
+  const handleSaveSocialSettings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setActionLoading(true)
+
+    const result = await saveSocialSettingsAction({
+      rapidapiKey,
+      linkedinUrl,
+      xUrl,
+      facebookUrl,
+    })
+
+    if (result.error) {
+      toast({ type: 'error', description: result.error })
+    } else {
+      toast({ type: 'success', description: 'Social integration configurations saved.' })
+      loadSettingsAndKb()
+    }
+    setActionLoading(false)
+  }
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -154,6 +190,16 @@ export default function SettingsPage() {
           }`}
         >
           <Key className="h-4 w-4" /> API Credentials
+        </button>
+        <button
+          onClick={() => setActiveTab('social')}
+          className={`px-4 py-2.5 text-sm font-semibold transition-all duration-200 border-b-2 -mb-px flex items-center gap-2 ${
+            activeTab === 'social'
+              ? 'border-violet-500 text-white'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Bot className="h-4 w-4" /> Social Automation
         </button>
         <button
           onClick={() => setActiveTab('kb')}
@@ -266,6 +312,131 @@ export default function SettingsPage() {
             </CardFooter>
           </form>
         </Card>
+      ) : activeTab === 'social' ? (
+        /* SOCIAL TAB */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Configuration Form */}
+          <div className="lg:col-span-1.5 space-y-6">
+            <Card className="border-slate-800/80 bg-slate-950/40 backdrop-blur-md">
+              <CardHeader>
+                <CardTitle className="text-md flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-violet-400" /> Social Channel Credentials
+                </CardTitle>
+                <CardDescription>
+                  Configure unofficial scrapers and gateways to automate DMs on social platforms
+                </CardDescription>
+              </CardHeader>
+              <form onSubmit={handleSaveSocialSettings}>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300">RapidAPI Unified Token</label>
+                    <Input
+                      type="password"
+                      placeholder="E.g., rapidapi_secret_key_..."
+                      value={rapidapiKey}
+                      onChange={(e) => setRapidapiKey(e.target.value)}
+                    />
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Provides authentication header for the scraper API endpoints below.
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300">LinkedIn Automation Gateway URL</label>
+                    <Input
+                      placeholder="E.g., https://linkedin-scraper.p.rapidapi.com/send"
+                      value={linkedinUrl}
+                      onChange={(e) => setLinkedinUrl(e.target.value)}
+                    />
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Placeholder for RapidAPI LinkedIn DM endpoint (Proxycurl / RapidAPI).
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300">X / Twitter Automation Gateway URL</label>
+                    <Input
+                      placeholder="E.g., https://twitter-dm.p.rapidapi.com/send"
+                      value={xUrl}
+                      onChange={(e) => setXUrl(e.target.value)}
+                    />
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Endpoint for automated direct messaging/replies on X.
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300">Facebook / Meta Scraper URL</label>
+                    <Input
+                      placeholder="E.g., https://meta-messenger.p.rapidapi.com/send"
+                      value={facebookUrl}
+                      onChange={(e) => setFacebookUrl(e.target.value)}
+                    />
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Messenger endpoint for corporate Facebook pages outreach.
+                    </span>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-end p-6 border-t border-slate-800/40">
+                  <Button type="submit" variant="premium" disabled={actionLoading}>
+                    {actionLoading ? 'Saving...' : 'Save Social Settings'}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          </div>
+
+          {/* Setup Guide, Hints, and Next Steps for New Users */}
+          <div className="lg:col-span-1.5 space-y-6">
+            <Card className="border-slate-800/80 bg-slate-950/40 backdrop-blur-md">
+              <CardHeader>
+                <CardTitle className="text-sm font-bold flex items-center gap-2 text-violet-400">
+                  <Info className="h-4 w-4" /> Next Steps & Setup Suggestions
+                </CardTitle>
+                <CardDescription>
+                  Follow these suggestions to configure and run your first autopilot campaign
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5 text-sm text-slate-300 leading-relaxed">
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-white flex items-center gap-1.5 text-xs">
+                    <ShieldCheck className="h-4 w-4 text-emerald-400 animate-pulse" /> 1. IP Whitelist check (Brevo)
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    If you configure a Brevo API key, remember to open your Brevo panel and allow connection from any IP. Brevo security whitelists are strict by default.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-white flex items-center gap-1.5 text-xs">
+                    💡 2. Social Automation Fallbacks
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    If you leave these URL placeholders empty, the Approvals Queue will fall back to safe manual operations: clicking **"Copy & Open Social"** will open the prospect's profile directly and copy the AI-tailored message to your clipboard for instant manual sending!
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-white flex items-center gap-1.5 text-xs">
+                    📅 3. Cal.com Meeting Booking
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Under the **Credentials** tab, paste your Cal.com scheduling handle in the "Email Domain & Cal.com Scheduling Handle" input. The AI writing agent will auto-inject your scheduling link in generated emails, and bookings will automatically advance deals on the Pipeline board.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-white flex items-center gap-1.5 text-xs">
+                    🚀 4. Trigger Campaign Sequence
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Once configs are ready, go to **Campaigns**, create a consulting outreach wizard sequence, and trigger the run. Watch your dashboard update in real-time!
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       ) : (
         /* KB TAB */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

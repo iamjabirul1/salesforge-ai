@@ -25,6 +25,8 @@ interface ApprovalItem {
     category?: string
     escalated?: boolean
     reason?: string
+    channel?: string
+    social_url?: string
   }
   created_at: string
 }
