@@ -24,6 +24,9 @@
     },
     "src/app/api/webhooks/email-events/route.ts": {
       "maxDuration": 30
+    },
+    "src/app/api/webhooks/reply-received/route.ts": {
+      "maxDuration": 30
     }
   },
   "crons": [

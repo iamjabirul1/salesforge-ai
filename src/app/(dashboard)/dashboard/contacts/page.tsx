@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/toast'
 import { createClient } from '@/lib/supabase/client'
-import { Users, UserPlus, Upload, Search, Trash2, ShieldAlert, Sparkles, Building, Loader2 } from 'lucide-react'
+import { Users, UserPlus, Upload, Search, Trash2, Sparkles, Building, Loader2, Flame, ThermometerSun, Snowflake, Info } from 'lucide-react'
 
 interface Contact {
   id: string
@@ -20,6 +20,7 @@ interface Contact {
   job_title: string | null
   status: string
   lead_score: number
+  enrichment_data: { lead_tag?: 'HOT' | 'WARM' | 'COLD'; score_rationale?: string } | null
   created_at: string
 }
 
@@ -45,7 +46,7 @@ export default function ContactsPage() {
     setLoading(true)
     const { data, error } = await supabase
       .from('contacts')
-      .select('id, first_name, last_name, email, company_name, job_title, status, lead_score, created_at')
+      .select('id, first_name, last_name, email, company_name, job_title, status, lead_score, enrichment_data, created_at')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -351,10 +352,27 @@ export default function ContactsPage() {
                         </Badge>
                       </td>
                       <td className="py-4 font-mono font-bold text-xs text-slate-300">
-                        <span className="flex items-center gap-1.5">
-                          <Sparkles className="h-3 w-3 text-amber-400" />
-                          {c.lead_score}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {c.enrichment_data?.lead_tag === 'HOT' && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded border flex items-center gap-0.5 text-red-400 bg-red-500/10 border-red-500/20">
+                              <Flame className="h-2.5 w-2.5" /> HOT
+                            </span>
+                          )}
+                          {c.enrichment_data?.lead_tag === 'WARM' && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded border flex items-center gap-0.5 text-amber-400 bg-amber-500/10 border-amber-500/20">
+                              <ThermometerSun className="h-2.5 w-2.5" /> WARM
+                            </span>
+                          )}
+                          {c.enrichment_data?.lead_tag === 'COLD' && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded border flex items-center gap-0.5 text-sky-400 bg-sky-500/10 border-sky-500/20">
+                              <Snowflake className="h-2.5 w-2.5" /> COLD
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 text-amber-400" />
+                            {c.lead_score}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-4 text-right">
                         <button
@@ -438,7 +456,7 @@ export default function ContactsPage() {
         <div className="space-y-4">
           <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800 text-xs text-slate-400 space-y-2">
             <div className="font-semibold text-slate-300 flex items-center gap-1.5">
-              <ShieldAlert className="h-3.5 w-3.5" /> CSV Formatting Rules:
+              <Info className="h-3.5 w-3.5" /> CSV Formatting Rules:
             </div>
             <p>1. Must contain an header row.</p>
             <p>2. Column header names recognized: &quot;email&quot;, &quot;first name&quot;, &quot;last name&quot;, &quot;company&quot;, &quot;title&quot;.</p>

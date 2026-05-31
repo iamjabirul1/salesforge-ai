@@ -10,6 +10,13 @@ interface EmailWriterConfig {
   stepNumber?: number
 }
 
+/**
+ * Email Writer Agent — with A/B Variant Generation & Personalization Hooks
+ * Upgraded with logic ported from AI DM Software:
+ * - A/B variant message generation (aiService.js → generateMessage + parseABVariants)
+ * - Personalization hook injection (extractHooks pattern)
+ * - Per-platform voice profiles (MessageComposer.getDefaultVoiceProfile)
+ */
 export async function runEmailWriterAgent({ campaignId, contactId, runId, orgId, stepNumber = 1 }: EmailWriterConfig) {
   const supabase = (await createClient()) as any
 
@@ -62,98 +69,144 @@ export async function runEmailWriterAgent({ campaignId, contactId, runId, orgId,
   }
   const channel = currentStepConfig.channel || 'email'
 
-  // Fetch Cal.com link (fallback to standard link)
-  const calLink = settings?.email_sending_domain // We will store cal.com url in email_sending_domain or setting
+  // Cal.com link
+  const calLink = settings?.email_sending_domain
     ? `https://cal.com/${settings.email_sending_domain}`
     : 'https://cal.com/salesforge-team'
 
-  // 3. Construct personalized prompt
+  // 3. Build prospect context
   const companyName = contact.company_name || 'your company'
   const jobTitle = contact.job_title || 'Decision Maker'
   const prospectName = contact.first_name || 'there'
   const senderName = settings?.email_sending_domain ? `Sales Team` : 'SalesForge Agent'
   const senderCompany = org?.name || 'SalesForge AI'
-  
-  let channelInstructions = ''
-  if (channel === 'linkedin') {
-    channelInstructions = `
-    You are writing a LinkedIn connection request or direct message.
-    - Keep it under 65 words (extremely short and conversational).
-    - Do not use formal email structures (no "Dear X", no formal sign-offs).
-    - Focus on a quick commonality or simple value proposition.
-    - Set the 'subject' field in the output JSON to "LinkedIn Connection".
-    `
-  } else if (channel === 'x') {
-    channelInstructions = `
-    You are writing a Twitter/X direct message.
-    - Keep it under 240 characters (extremely concise and casual).
-    - Write as if typing a quick text message. No formatting or formal layout.
-    - Set the 'subject' field in the output JSON to "X DM Outreach".
-    `
-  } else if (channel === 'facebook') {
-    channelInstructions = `
-    You are writing a Meta/Facebook Messenger outreach message.
-    - Keep it under 80 words. Friendly and professional.
-    - Focused on initiating a quick conversation.
-    - Set the 'subject' field in the output JSON to "Facebook Message".
-    `
-  } else {
-    channelInstructions = `
-    You are writing a short cold email.
-    - Keep it under 110 words.
-    - Value-driven: Solve a key problem for service businesses.
-    - Low friction call to action (e.g. asking for a yes/no response).
-    `
+
+  // 4. Extract personalization hooks from enrichment data (set by research agent)
+  const hooks: Array<{ type: string; text: string; confidence: number }> =
+    contact.enrichment_data?.personalization_hooks || []
+  const leadTag: string = contact.enrichment_data?.lead_tag || 'WARM'
+  const leadScore: number = contact.lead_score || 50
+
+  const hooksText = hooks.length > 0
+    ? hooks
+        .slice(0, 3)
+        .map((h, i) => `${i + 1}. ${h.text} (type: ${h.type}, confidence: ${Math.round(h.confidence * 100)}%)`)
+        .join('\n')
+    : 'No specific hooks available — use their job title and company name for personalization.'
+
+  // 5. Per-platform voice profile (ported from AI DM Software MessageComposer)
+  interface VoiceProfile {
+    tone: string
+    maxLength: number
+    style: string
+    taboo: string[]
   }
 
-  const prompt = `You are a world-class B2B Sales Development Representative (SDR). Write a short, highly personalized cold outreach message to a prospect.
-  
-  Prospect Info:
-  - Name: ${prospectName} ${contact.last_name || ''}
-  - Company: ${companyName}
-  - Job Title: ${jobTitle}
-  - Industry: ${contact.industry || 'B2B'}
-  - Enrichment Info: ${JSON.stringify(contact.enrichment_data)}
-  
-  Sender Info:
-  - Name: ${senderName}
-  - Company: ${senderCompany}
-  - Cal.com Link: ${calLink}
-  - Our Services: Service businesses (custom software development, consulting, growth marketing)
-  
-  Campaign Goal/Context:
-  - Campaign Name: ${campaign.name}
-  - Context: ${JSON.stringify(campaign.target_icp)}
-  - Channel: ${channel.toUpperCase()}
+  const voiceProfiles: Record<string, VoiceProfile> = {
+    email: {
+      tone: 'professional yet conversational',
+      maxLength: 110,
+      style: 'AIDA framework: Attention, Interest, Desire, Action. Low-friction CTA.',
+      taboo: ['buy now', 'limited time offer', 'click here', 'guaranteed'],
+    },
+    linkedin: {
+      tone: 'professional, value-first',
+      maxLength: 200,
+      style: 'Connection request or DM. No "Hey". Reference their role or company specifically.',
+      taboo: ['hey', 'yo', 'wanna', 'generic sales pitch'],
+    },
+    x: {
+      tone: 'casual and direct',
+      maxLength: 240,
+      style: 'Twitter/X DM. Ultra-concise. Like a text message. Max 240 characters TOTAL.',
+      taboo: ['follow4follow', 'formal openers', 'long paragraphs'],
+    },
+    facebook: {
+      tone: 'warm and friendly',
+      maxLength: 80,
+      style: 'Facebook Messenger. Community-focused. Friendly and approachable. Short.',
+      taboo: ['mlm', 'pyramid', 'guaranteed income'],
+    },
+  }
 
-  Channel-Specific Guidelines:
-  ${channelInstructions}
+  const voice = voiceProfiles[channel] || voiceProfiles.email
 
-  General Guidelines:
-  1. PERSONALIZED: Reference their company and job title naturally.
-  2. DYNAMIC INSERT: You may include the sender's Cal.com link using the text "${calLink}" if the context feels appropriate for booking.
-  3. DO NOT sound like a generic templates marketing email. Write like a human writing.
+  // 6. Build A/B variant prompt (ported from AI DM Software aiService.buildMessagePrompt)
+  const prompt = `You are a world-class B2B Sales Development Representative generating TWO personalized ${channel === 'email' ? 'cold email' : `${channel} DM`} variants (A/B test).
 
-  Format your response as a valid JSON object. Do not wrap it in markdown blocks.
-  Fields:
-  - subject: The subject line (for email) or channel placeholder subject (for social).
-  - body: The body of the outreach message in plain text. Use double newlines for paragraphs.`
+PROSPECT PROFILE:
+- Name: ${prospectName} ${contact.last_name || ''}
+- Company: ${companyName}  
+- Job Title: ${jobTitle}
+- Industry: ${contact.industry || 'B2B'}
+- Lead Score: ${leadScore}/100 (${leadTag} lead)
 
-  // 4. Generate message via OpenRouter (using writing model)
+PERSONALIZATION HOOKS (use 1 naturally, pick the most relevant):
+${hooksText}
+
+SENDER:
+- Name: ${senderName}
+- Company: ${senderCompany}
+- Services: Custom AI/software consulting, capacity scaling, growth engineering
+- Scheduling Link: ${calLink}
+
+VOICE PROFILE for ${channel.toUpperCase()}:
+- Tone: ${voice.tone}
+- Max Length: ${voice.maxLength} words
+- Style: ${voice.style}
+- AVOID: ${voice.taboo.join(', ')}
+
+VARIANT A: Use the FIRST personalization hook. Focus on their company growth angle.
+VARIANT B: Use the SECOND personalization hook (or a different angle). Focus on their job title challenges.
+
+RULES:
+1. Each variant must feel human, not templated.
+2. Include the Cal.com link (${calLink}) ONLY in email channel, only if it feels natural.
+3. For LinkedIn/X/Facebook: NO links, keep ultra short per platform limits.
+4. Different hook, different angle, different opening — both variants must be meaningfully distinct.
+
+FORMAT EXACTLY (no extra text outside these markers):
+---VARIANT_A_SUBJECT---
+[subject line for email, or "LinkedIn DM" / "X DM" / "Facebook Message" for social]
+---VARIANT_A_BODY---
+[message body]
+---VARIANT_B_SUBJECT---
+[subject line for email, or same platform label]
+---VARIANT_B_BODY---
+[message body]
+---END---`
+
+  // 7. Generate message via OpenRouter
   const { text } = await generateText({
     model: openrouter(MODELS.writing),
     prompt,
   })
 
-  // Clean and parse
-  const cleanText = text.trim().replace(/^```json/, '').replace(/```$/, '').trim()
-  const parsedEmail = JSON.parse(cleanText)
+  // 8. Parse A/B variants
+  let subjectA = ''
+  let bodyA = ''
+  let subjectB = ''
+  let bodyB = ''
 
-  if (!parsedEmail.subject || !parsedEmail.body) {
-    throw new Error('LLM generated invalid message object.')
+  try {
+    subjectA = text.match(/---VARIANT_A_SUBJECT---\s*([\s\S]*?)\s*---VARIANT_A_BODY---/)?.[1]?.trim() || ''
+    bodyA = text.match(/---VARIANT_A_BODY---\s*([\s\S]*?)\s*---VARIANT_B_SUBJECT---/)?.[1]?.trim() || ''
+    subjectB = text.match(/---VARIANT_B_SUBJECT---\s*([\s\S]*?)\s*---VARIANT_B_BODY---/)?.[1]?.trim() || ''
+    bodyB = text.match(/---VARIANT_B_BODY---\s*([\s\S]*?)\s*---END---/)?.[1]?.trim() || ''
+
+    if (!bodyA) throw new Error('Failed to parse variant A')
+    if (!bodyB) bodyB = bodyA // Fallback — use A as B if parsing fails
+    if (!subjectA) subjectA = channel === 'email' ? `Quick question for ${prospectName}` : `${channel} outreach`
+    if (!subjectB) subjectB = subjectA
+  } catch {
+    // Fallback: treat entire response as variant A body
+    bodyA = text.trim().replace(/---[A-Z_]+---/g, '').trim()
+    bodyB = bodyA
+    subjectA = channel === 'email' ? `Opportunity for ${companyName}` : `${channel} outreach`
+    subjectB = subjectA
   }
 
-  // 5. Insert outreach item into 'outreach_queue'
+  // 9. Insert outreach item into 'outreach_queue' with A/B variant data
   const { data: outreachItem, error: queueError } = await supabase
     .from('outreach_queue')
     .insert({
@@ -162,10 +215,22 @@ export async function runEmailWriterAgent({ campaignId, contactId, runId, orgId,
       contact_id: contactId,
       channel: channel as any,
       status: 'pending',
-      subject: parsedEmail.subject,
-      body: parsedEmail.body,
+      subject: subjectA,
+      body: bodyA,
       requires_approval: true,
       scheduled_at: new Date(Date.now() + 60 * 1000).toISOString(),
+      // Store B variant + metadata in content JSONB
+      content: {
+        subject_a: subjectA,
+        body_a: bodyA,
+        subject_b: subjectB,
+        body_b: bodyB,
+        step: stepNumber,
+        hooks_used: hooks.slice(0, 2).map((h) => h.text),
+        lead_score: leadScore,
+        lead_tag: leadTag,
+        ab_variant_selected: 'A', // Default to A; user can switch in Approvals UI
+      },
     })
     .select('id')
     .single()
@@ -174,43 +239,48 @@ export async function runEmailWriterAgent({ campaignId, contactId, runId, orgId,
     throw new Error(`Queue insert failed: ${queueError?.message}`)
   }
 
-  // 6. Insert into 'approval_queue' for human review
+  // 10. Insert into 'approval_queue' for human review
   const actionType = channel === 'email' ? 'send_email' : 'send_social_message'
-  const socialUrl = channel === 'linkedin' 
-    ? contact.linkedin_url 
-    : channel === 'x' 
-    ? `https://x.com/${contact.first_name || ''}${contact.last_name || ''}` 
-    : channel === 'facebook'
-    ? `https://facebook.com/search/top?q=${encodeURIComponent(contact.company_name || '')}`
-    : null
+  const socialUrl =
+    channel === 'linkedin'
+      ? contact.linkedin_url
+      : channel === 'x'
+      ? `https://x.com/${contact.first_name || ''}${contact.last_name || ''}`
+      : channel === 'facebook'
+      ? `https://facebook.com/search/top?q=${encodeURIComponent(contact.company_name || '')}`
+      : null
 
-  await supabase
-    .from('approval_queue')
-    .insert({
-      org_id: orgId,
-      agent_run_id: runId,
-      action_type: actionType,
-      status: 'pending',
-      context: {
-        outreach_id: outreachItem.id,
-        contact_id: contactId,
-        prospect_name: `${prospectName} ${contact.last_name || ''}`,
-        company_name: companyName,
-        subject: parsedEmail.subject,
-        body: parsedEmail.body,
-        channel,
-        social_url: socialUrl,
-      },
-    })
+  await supabase.from('approval_queue').insert({
+    org_id: orgId,
+    agent_run_id: runId,
+    action_type: actionType,
+    status: 'pending',
+    context: {
+      outreach_id: outreachItem.id,
+      contact_id: contactId,
+      prospect_name: `${prospectName} ${contact.last_name || ''}`,
+      company_name: companyName,
+      subject: subjectA,
+      body: bodyA,
+      subject_b: subjectB,
+      body_b: bodyB,
+      channel,
+      social_url: socialUrl,
+      lead_score: leadScore,
+      lead_tag: leadTag,
+      hooks: hooks.slice(0, 3),
+      has_ab_variant: true,
+    },
+  })
 
-  // 7. Log activity in CRM timeline
+  // 11. Log activity in CRM timeline
   const channelLabel = channel.toUpperCase()
   await supabase.from('activities').insert({
     org_id: orgId,
     contact_id: contactId,
     type: 'note_added',
-    subject: `${channelLabel} Draft Created`,
-    description: `AI Agent drafted ${channelLabel} message: "${parsedEmail.subject}". Waiting for human approval in queue.`,
+    subject: `${channelLabel} A/B Draft Created`,
+    description: `AI Agent drafted 2 ${channelLabel} variants for "${subjectA}". Lead Score: ${leadScore}/100 (${leadTag}). Awaiting human approval.`,
   })
 
   return outreachItem

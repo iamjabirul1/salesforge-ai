@@ -1,6 +1,49 @@
 import { openrouter, MODELS } from '../openrouter'
 import { generateText } from 'ai'
 import { createClient } from '@/lib/supabase/server'
+import { leadScoringEngine } from '@/lib/scoring/engine'
+
+/**
+ * Extract AI personalization hooks from profile data
+ * Ported from AI DM Software — aiService.extractHooks()
+ */
+async function extractPersonalizationHooks(contact: any, criteria: any): Promise<Array<{ type: string; text: string; confidence: number }>> {
+  try {
+    const prompt = `Extract 3 high-quality personalization hooks from this B2B prospect profile for cold outreach.
+
+PROFILE:
+Name: ${contact.first_name} ${contact.last_name || ''}
+Title: ${contact.job_title || 'Unknown'}
+Company: ${contact.company_name || 'Unknown'}
+Industry: ${contact.industry || 'Unknown'}
+Enrichment: ${JSON.stringify(contact.enrichment_data || {})}
+
+REQUIREMENTS:
+- Focus on SPECIFIC signals (achievements, role changes, company growth, recent hires)
+- Prioritize ACTIONABLE hooks that create a natural reason to reach out
+- Each hook should feel like a genuine reason to connect
+- AVOID: generic facts, obvious statements
+
+Return ONLY a valid JSON array. No markdown, no explanation:
+[
+  { "type": "recent_achievement", "text": "recently expanded their engineering team", "confidence": 0.8 },
+  { "type": "company_signal", "text": "scaling their SaaS product into enterprise market", "confidence": 0.7 },
+  { "type": "role_relevance", "text": "as Head of Product, likely managing custom integrations", "confidence": 0.9 }
+]`
+
+    const { text } = await generateText({
+      model: openrouter(MODELS.fast),
+      prompt,
+    })
+
+    const clean = text.trim().replace(/^```json/, '').replace(/```$/, '').trim()
+    const parsed = JSON.parse(clean)
+    if (Array.isArray(parsed)) return parsed.slice(0, 5)
+    return []
+  } catch {
+    return []
+  }
+}
 
 interface ResearchCriteria {
   industries?: string[]
@@ -190,14 +233,60 @@ export async function runResearchAgent(runId: string, orgId: string, criteria: R
 
       if (newContact) {
         savedContacts.push(newContact)
-        
+
+        // Run lead scoring engine (ported from AI DM Software)
+        try {
+          const scoringResult = leadScoringEngine.scoreCandidate({
+            first_name: newContact.first_name,
+            last_name: newContact.last_name,
+            job_title: newContact.job_title,
+            company_name: newContact.company_name,
+            location: newContact.location,
+            industry: newContact.industry,
+            email: newContact.email,
+            linkedin_url: newContact.linkedin_url,
+            phone: newContact.phone,
+            enrichment_data: newContact.enrichment_data,
+            keywords: criteria.job_titles || [],
+            target_locations: criteria.locations || [],
+          })
+
+          // Extract personalization hooks via AI (ported from AI DM Software)
+          const hooks = await extractPersonalizationHooks(newContact, criteria)
+
+          // Update contact with score + hooks
+          await supabase
+            .from('contacts')
+            .update({
+              lead_score: scoringResult.lead_score,
+              enrichment_data: {
+                ...(newContact.enrichment_data || {}),
+                lead_tag: scoringResult.tag,
+                score_rationale: scoringResult.score_rationale,
+                score_contributions: scoringResult.contributions,
+                personalization_hooks: hooks,
+              },
+            })
+            .eq('id', newContact.id)
+
+          // Merge hooks back into contact for email writer
+          newContact.enrichment_data = {
+            ...(newContact.enrichment_data || {}),
+            personalization_hooks: hooks,
+            lead_tag: scoringResult.tag,
+          }
+          newContact.lead_score = scoringResult.lead_score
+        } catch (scoringErr) {
+          console.warn('Lead scoring failed for contact', newContact.id, scoringErr)
+        }
+
         // Log contact discovery activity
         await supabase.from('activities').insert({
           org_id: orgId,
           contact_id: newContact.id,
           type: 'note_added',
-          subject: 'Lead Discovered',
-          description: `Prospect identified by Research Agent. Title: ${lead.job_title} at ${lead.company_name}. Email: ${lead.email}`,
+          subject: 'Lead Discovered & Scored',
+          description: `Prospect identified by Research Agent. ${lead.job_title} at ${lead.company_name}. Score: ${newContact.lead_score ?? '?'}/100 (${newContact.enrichment_data?.lead_tag ?? 'WARM'}).`,
         })
       }
     }

@@ -20,6 +20,11 @@ import {
   ExternalLink,
   MessageSquare,
   MessageCircleOff,
+  Flame,
+  ThermometerSun,
+  Snowflake,
+  Lightbulb,
+  BarChart2,
 } from 'lucide-react'
 
 interface ContactDetail {
@@ -251,6 +256,81 @@ export default function ContactDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* AI Lead Intelligence Card */}
+            {(contact.enrichment_data?.lead_tag || contact.enrichment_data?.personalization_hooks?.length > 0) && (
+              <Card className="border-slate-800/80 bg-slate-950/40 backdrop-blur-md">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <BarChart2 className="h-4 w-4 text-violet-400" /> AI Lead Intelligence
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-xs">
+                  {/* Lead Tag */}
+                  {contact.enrichment_data?.lead_tag && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Lead Temperature</span>
+                      <span className={`px-2 py-1 rounded-full border font-bold flex items-center gap-1 ${
+                        contact.enrichment_data.lead_tag === 'HOT'
+                          ? 'text-red-400 bg-red-500/10 border-red-500/20'
+                          : contact.enrichment_data.lead_tag === 'WARM'
+                          ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                          : 'text-sky-400 bg-sky-500/10 border-sky-500/20'
+                      }`}>
+                        {contact.enrichment_data.lead_tag === 'HOT' && <Flame className="h-3 w-3" />}
+                        {contact.enrichment_data.lead_tag === 'WARM' && <ThermometerSun className="h-3 w-3" />}
+                        {contact.enrichment_data.lead_tag === 'COLD' && <Snowflake className="h-3 w-3" />}
+                        {contact.enrichment_data.lead_tag}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Score Rationale */}
+                  {contact.enrichment_data?.score_rationale && (
+                    <p className="text-slate-400 italic border-l border-slate-700 pl-3 leading-relaxed">
+                      {contact.enrichment_data.score_rationale}
+                    </p>
+                  )}
+
+                  {/* Score Breakdown Bars */}
+                  {contact.enrichment_data?.score_contributions && (
+                    <div className="space-y-2">
+                      <div className="text-slate-500 font-semibold">Score Breakdown</div>
+                      {(contact.enrichment_data.score_contributions as any[]).map((c: any) => (
+                        <div key={c.attribute} className="space-y-1">
+                          <div className="flex justify-between text-slate-400">
+                            <span className="capitalize">{c.attribute.replace(/_/g, ' ')}</span>
+                            <span className="font-mono text-slate-300">{c.score}/{c.weight}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                            <div
+                              className="h-full bg-violet-500/70 rounded-full transition-all"
+                              style={{ width: `${Math.round((c.score / c.weight) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Personalization Hooks */}
+                  {contact.enrichment_data?.personalization_hooks?.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-slate-500 font-semibold flex items-center gap-1.5">
+                        <Lightbulb className="h-3 w-3 text-violet-400" /> Personalization Hooks
+                      </div>
+                      {(contact.enrichment_data.personalization_hooks as any[]).map((hook: any, i: number) => (
+                        <div key={i} className="flex items-start gap-2 text-slate-300">
+                          <span className="text-violet-400 mt-0.5">→</span>
+                          <span>{hook.text}</span>
+                          <span className="ml-auto text-slate-600 font-mono">{Math.round(hook.confidence * 100)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right/Middle Column: Timeline & Simulator */}
