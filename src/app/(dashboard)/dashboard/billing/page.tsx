@@ -53,13 +53,16 @@ export default function BillingPage() {
     
     toast({
       type: 'info',
-      description: `Redirecting to simulated ${provider === 'stripe' ? 'Stripe Secure' : 'PayPal Express'} portal...`,
+      description: `Redirecting to secure ${provider === 'stripe' ? 'Stripe Secure' : 'PayPal Express'} portal...`,
     })
 
     const result = await upgradePlanAction(plan, provider)
 
     if (result.error) {
       toast({ type: 'error', description: result.error })
+    } else if (result.url) {
+      // Redirect to the real Stripe or PayPal checkout session
+      window.location.href = result.url
     } else {
       toast({
         type: 'success',

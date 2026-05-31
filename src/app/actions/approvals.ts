@@ -65,6 +65,53 @@ export async function approveAction(approvalId: string, editedSubject?: string, 
   } = await supabase.auth.getUser()
 
   if (!isEmail) {
+    // A. Fetch social credentials from organization settings
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('settings')
+      .eq('id', approval.org_id)
+      .single()
+
+    const settingsObj = org?.settings || {}
+    const rapidapiKey = settingsObj.social_rapidapi_key
+    const channelUrls: Record<string, string> = {
+      linkedin: settingsObj.social_linkedin_url || '',
+      x: settingsObj.social_x_url || '',
+      facebook: settingsObj.social_facebook_url || '',
+    }
+
+    const gatewayUrl = channelUrls[outreach.channel || '']
+    let apiSent = false
+    let apiError: string | null = null
+
+    if (rapidapiKey && gatewayUrl) {
+      try {
+        const response = await fetch(gatewayUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-RapidAPI-Key': rapidapiKey,
+          },
+          body: JSON.stringify({
+            recipient: outreach.channel === 'linkedin' ? contact.linkedin_url : contact.email,
+            message: finalBody,
+          }),
+        })
+        if (response.ok) {
+          apiSent = true
+        } else {
+          const errText = await response.text()
+          apiError = `API endpoint returned status ${response.status}: ${errText}`
+        }
+      } catch (err: any) {
+        apiError = err.message || 'Network error communicating with social gateway.'
+      }
+    }
+
+    if (gatewayUrl && !apiSent) {
+      return { error: `Failed to automate social dispatch: ${apiError || 'Invalid API response.'}` }
+    }
+
     // Update Outreach and Approval statuses directly
     await supabase
       .from('outreach_queue')
@@ -92,8 +139,10 @@ export async function approveAction(approvalId: string, editedSubject?: string, 
       contact_id: contactId,
       type: 'note_added',
       subject: `${channelLabel} Message Dispatched`,
-      description: `${channelLabel} message sent to prospect.`,
-      metadata: { body: finalBody },
+      description: apiSent 
+        ? `${channelLabel} message automated & sent to prospect via custom API gateway.`
+        : `${channelLabel} message prepared for manual copy & send.`,
+      metadata: { body: finalBody, automated: apiSent },
     })
 
     // Update contact status to contacted
@@ -102,7 +151,7 @@ export async function approveAction(approvalId: string, editedSubject?: string, 
       .update({ status: 'contacted' })
       .eq('id', contactId)
 
-    return { success: true }
+    return { success: true, automated: apiSent }
   }
 
   // 3. Mark outreach as sending (For Email)

@@ -33,17 +33,58 @@ export async function processSequenceQueue(): Promise<{ processed: number; error
   for (const item of dueItems) {
     try {
       const contact = (item as any).contacts
-      if (!contact?.email) continue
+      const channel = item.channel || 'email'
+      
+      if (channel === 'email') {
+        if (!contact?.email) continue
+        const content = item.content as any
+        const recipientName = [contact.first_name, contact.last_name].filter(Boolean).join(' ') || 'there'
 
-      const content = item.content as any
-      const recipientName = [contact.first_name, contact.last_name].filter(Boolean).join(' ') || 'there'
-
-      await sendEmailViaBravo({
-        to: contact.email,
-        toName: recipientName,
-        subject: content.subject,
-        html: content.body.replace(/\n/g, '<br>'),
-      })
+        await sendEmailViaBravo({
+          to: contact.email,
+          toName: recipientName,
+          subject: content.subject,
+          html: content.body.replace(/\n/g, '<br>'),
+        })
+      } else {
+        // Social channel dispatch
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('settings')
+          .eq('id', item.org_id)
+          .maybeSingle()
+        
+        const settingsObj = org?.settings || {}
+        const rapidapiKey = settingsObj.social_rapidapi_key
+        const channelUrls: Record<string, string> = {
+          linkedin: settingsObj.social_linkedin_url || '',
+          x: settingsObj.social_x_url || '',
+          facebook: settingsObj.social_facebook_url || '',
+        }
+        
+        const gatewayUrl = channelUrls[channel]
+        const content = item.content as any
+        
+        if (rapidapiKey && gatewayUrl) {
+          const response = await fetch(gatewayUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-RapidAPI-Key': rapidapiKey,
+            },
+            body: JSON.stringify({
+              recipient: channel === 'linkedin' ? contact.linkedin_url : contact.email,
+              message: content.body || item.body || '',
+            }),
+          })
+          if (!response.ok) {
+            throw new Error(`Social dispatch API returned status ${response.status}`)
+          }
+        } else {
+          // If no API gateway is configured, fallback to standard mock send for background dispatching
+          console.warn(`No social gateway configured for channel ${channel}. Prepared dispatch log: ${content.body || item.body}`)
+        }
+      }
 
       // Mark as sent
       await supabase
@@ -54,14 +95,16 @@ export async function processSequenceQueue(): Promise<{ processed: number; error
       // Log activity
       await supabase.from('activities').insert({
         contact_id: item.contact_id,
-        type: 'email_sent',
-        subject: content.subject,
-        description: `Cold email sent to ${contact.email}`,
+        type: channel === 'email' ? 'email_sent' : 'note_added',
+        subject: channel === 'email' ? (item.content as any).subject : `${channel.toUpperCase()} Sent`,
+        description: channel === 'email' 
+          ? `Cold email sent to ${contact.email}` 
+          : `${channel.toUpperCase()} message dispatched to prospect.`,
       })
 
       processed++
     } catch (err) {
-      console.error('Failed to send email for outreach item', item.id, err)
+      console.error('Failed to send outreach item', item.id, err)
       await supabase
         .from('outreach_queue')
         .update({ status: 'failed' })
