@@ -15,6 +15,7 @@ import {
   Mail,
   Bot,
   CheckSquare,
+  Zap,
   Trophy,
 } from 'lucide-react'
 
@@ -80,6 +81,13 @@ export function OnboardingTour() {
       description: 'You maintain full control. Every agent-drafted outreach email is queued here. Preview, edit, and click Approve to send.',
       icon: CheckSquare,
       color: 'from-emerald-500 to-teal-500',
+    },
+    {
+      targetId: 'sidebar-automation',
+      title: 'Email & Social Automation',
+      description: 'Monitor all outreach across every channel. Track open rates, click rates, reply rates, and manually trigger queue processing for bulk email sends.',
+      icon: Zap,
+      color: 'from-orange-500 to-amber-500',
     },
     {
       targetId: '',

@@ -17,6 +17,7 @@ import {
   Settings,
   LogOut,
   CreditCard,
+  Zap,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -34,6 +35,7 @@ export function Sidebar({ className }: SidebarProps) {
     { name: 'Campaigns', href: '/dashboard/campaigns', icon: Mail },
     { name: 'AI Agents', href: '/dashboard/agents', icon: Bot },
     { name: 'Approvals', href: '/dashboard/approvals', icon: CheckSquare },
+    { name: 'Automation', href: '/dashboard/automation', icon: Zap },
     { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
     { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },

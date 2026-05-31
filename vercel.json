@@ -15,8 +15,23 @@
     },
     "src/app/api/webhooks/resend/route.ts": {
       "maxDuration": 30
+    },
+    "src/app/api/cron/process-queue/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/webhooks/cal/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/webhooks/email-events/route.ts": {
+      "maxDuration": 30
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/process-queue",
+      "schedule": "*/10 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
